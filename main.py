@@ -64,19 +64,27 @@ Hozirda qo'llab-quvvatlanadigan tillar:
 
 Til o'zgartirish funksiyasi ishlab chiqilmoqda...""",
     
-    'choose_effect': """🎨 Effekt tanlang:
-
-1️⃣ Oddiy dumaloq video
-2️⃣ Zoom effekti (kattalashtirish)
-3️⃣ Blur effekti (loyqalashtirish)
-4️⃣ Rang o'zgarishi effekti
-5️⃣ Aylanish effekti
-
-Raqam yuboring (1-5):""",
-    
-    'invalid_choice': "❌ Noto'g'ri tanlov. Iltimos, 1 dan 5 gacha raqam yuboring.",
+    'choose_effect': "🎨 Quyidagi effektlardan birini tanlang:",
     'effect_processing': "🎬 Effekt qo'llanmoqda..."
 }
+
+def create_effect_keyboard():
+    """Create inline keyboard for effect selection"""
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    
+    # Create buttons for each effect
+    btn1 = types.InlineKeyboardButton("📹 Oddiy", callback_data="effect_1")
+    btn2 = types.InlineKeyboardButton("🔍 Zoom", callback_data="effect_2")
+    btn3 = types.InlineKeyboardButton("🌫️ Blur", callback_data="effect_3")
+    btn4 = types.InlineKeyboardButton("🌈 Rang", callback_data="effect_4")
+    btn5 = types.InlineKeyboardButton("🔄 Aylanish", callback_data="effect_5")
+    
+    # Add buttons to markup
+    markup.add(btn1, btn2)
+    markup.add(btn3, btn4)
+    markup.add(btn5)
+    
+    return markup
 
 def create_temp_file(suffix=""):
     """Create a temporary file and return its path"""
@@ -246,8 +254,9 @@ def handle_video(message):
         }
         user_states[user_id] = 'choosing_effect'
         
-        # Send effect selection menu
-        bot.reply_to(message, MESSAGES['choose_effect'])
+        # Send effect selection menu with inline keyboard
+        markup = create_effect_keyboard()
+        bot.reply_to(message, MESSAGES['choose_effect'], reply_markup=markup)
             
     except Exception as e:
         logger.error(f"Error handling video: {e}")
@@ -279,8 +288,9 @@ def handle_photo(message):
         }
         user_states[user_id] = 'choosing_effect'
         
-        # Send effect selection menu
-        bot.reply_to(message, MESSAGES['choose_effect'])
+        # Send effect selection menu with inline keyboard
+        markup = create_effect_keyboard()
+        bot.reply_to(message, MESSAGES['choose_effect'], reply_markup=markup)
             
     except Exception as e:
         logger.error(f"Error handling photo: {e}")
@@ -291,36 +301,42 @@ def handle_unsupported(message):
     """Handle unsupported file types"""
     bot.reply_to(message, MESSAGES['unsupported'])
 
+@bot.callback_query_handler(func=lambda call: call.data.startswith('effect_'))
+def handle_effect_callback(call):
+    """Handle inline button callbacks for effect selection"""
+    try:
+        user_id = call.from_user.id
+        effect_type = int(call.data.split('_')[1])
+        
+        # Answer callback to remove loading state
+        bot.answer_callback_query(call.id)
+        
+        # Process media with selected effect
+        process_media_with_effect_callback(call, effect_type)
+        
+    except Exception as e:
+        logger.error(f"Error handling effect callback: {e}")
+        bot.answer_callback_query(call.id, text="❌ Xatolik yuz berdi")
+
 @bot.message_handler(func=lambda message: True)
 def handle_text_messages(message):
     """Handle all text messages"""
-    user_id = message.from_user.id
-    text = message.text.strip()
-    
-    # Check if user is choosing effect
-    if user_states.get(user_id) == 'choosing_effect':
-        if text in ['1', '2', '3', '4', '5']:
-            effect_type = int(text)
-            process_media_with_effect(message, effect_type)
-        else:
-            bot.reply_to(message, MESSAGES['invalid_choice'])
-    else:
-        # Default welcome message
-        user_name = message.from_user.first_name or "Foydalanuvchi"
-        welcome_text = MESSAGES['welcome'].format(user_name)
-        bot.reply_to(message, welcome_text)
+    # Default welcome message
+    user_name = message.from_user.first_name or "Foydalanuvchi"
+    welcome_text = MESSAGES['welcome'].format(user_name)
+    bot.reply_to(message, welcome_text)
 
-def process_media_with_effect(message, effect_type):
-    """Process stored media with selected effect"""
-    user_id = message.from_user.id
+def process_media_with_effect_callback(call, effect_type):
+    """Process stored media with selected effect from callback"""
+    user_id = call.from_user.id
     
     try:
         if user_id not in user_media_files:
-            bot.reply_to(message, MESSAGES['error'])
+            bot.edit_message_text("❌ Media fayl topilmadi", call.message.chat.id, call.message.message_id)
             return
         
-        # Send processing message
-        processing_msg = bot.reply_to(message, MESSAGES['effect_processing'])
+        # Edit message to show processing
+        bot.edit_message_text(MESSAGES['effect_processing'], call.message.chat.id, call.message.message_id)
         
         media_info = user_media_files[user_id]
         input_file = media_info['file_path']
@@ -337,20 +353,19 @@ def process_media_with_effect(message, effect_type):
             # Send the kruzhok
             with open(output_file, 'rb') as video:
                 bot.send_video_note(
-                    message.chat.id,
+                    call.message.chat.id,
                     video,
                     duration=media_info['duration'],
-                    length=480,  # Circular video diameter
-                    reply_to_message_id=message.message_id
+                    length=480  # Circular video diameter
                 )
             
             # Delete processing message
-            bot.delete_message(message.chat.id, processing_msg.message_id)
+            bot.delete_message(call.message.chat.id, call.message.message_id)
         else:
             bot.edit_message_text(
                 MESSAGES['error'],
-                message.chat.id,
-                processing_msg.message_id
+                call.message.chat.id,
+                call.message.message_id
             )
         
         # Clean up
@@ -365,7 +380,7 @@ def process_media_with_effect(message, effect_type):
             
     except Exception as e:
         logger.error(f"Error processing media with effect: {e}")
-        bot.reply_to(message, MESSAGES['error'])
+        bot.edit_message_text("❌ Xatolik yuz berdi", call.message.chat.id, call.message.message_id)
         
         # Clear user state on error
         if user_id in user_states:
