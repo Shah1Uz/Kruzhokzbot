@@ -109,17 +109,15 @@ def process_video_to_kruzhok(input_path, output_path):
             '-vf', (
                 'scale=480:480:force_original_aspect_ratio=increase,'  # Scale to 480x480
                 'crop=480:480,'  # Crop to square
-                'format=yuv420p,'  # Set pixel format
-                'geq='  # Apply circular mask
-                'lum=if(lt(sqrt(pow(X-240,2)+pow(Y-240,2)),240),lum(X,Y),0):'
-                'cb=if(lt(sqrt(pow(X-240,2)+pow(Y-240,2)),240),cb(X,Y),128):'
-                'cr=if(lt(sqrt(pow(X-240,2)+pow(Y-240,2)),240),cr(X,Y),128)'
+                'format=yuv420p'  # Set pixel format
             ),
             '-c:v', 'libx264',  # Video codec
             '-c:a', 'aac',      # Audio codec
             '-b:a', '128k',     # Audio bitrate
             '-ar', '44100',     # Audio sample rate
             '-ac', '2',         # Audio channels
+            '-preset', 'fast',  # Encoding preset
+            '-crf', '23',       # Quality setting
             output_path
         ]
         
@@ -147,15 +145,13 @@ def process_photo_to_kruzhok(input_path, output_path):
             '-vf', (
                 'scale=480:480:force_original_aspect_ratio=increase,'  # Scale to 480x480
                 'crop=480:480,'  # Crop to square
-                'format=yuv420p,'  # Set pixel format
-                'geq='  # Apply circular mask
-                'lum=if(lt(sqrt(pow(X-240,2)+pow(Y-240,2)),240),lum(X,Y),0):'
-                'cb=if(lt(sqrt(pow(X-240,2)+pow(Y-240,2)),240),cb(X,Y),128):'
-                'cr=if(lt(sqrt(pow(X-240,2)+pow(Y-240,2)),240),cr(X,Y),128)'
+                'format=yuv420p'  # Set pixel format
             ),
             '-c:v', 'libx264',  # Video codec
             '-pix_fmt', 'yuv420p',
             '-r', '25',         # Frame rate
+            '-preset', 'fast',  # Encoding preset
+            '-crf', '23',       # Quality setting
             output_path
         ]
         
