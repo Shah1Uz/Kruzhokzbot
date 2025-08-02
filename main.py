@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 import telebot
 from telebot import types
-from models import create_tables, save_user_history, get_user_history, get_total_user_kruzhoks
+from models import create_tables, save_user_history, get_user_history, get_total_user_kruzhoks, set_user_language, get_user_language
 
 # Configure logging
 logging.basicConfig(
@@ -37,9 +37,10 @@ EFFECT_NAMES = {
     5: "Aylanish"
 }
 
-# Uzbek language messages
+# Multi-language messages
 MESSAGES = {
-    'welcome': """👋 Salom, {}!
+    'uz': {
+        'welcome': """👋 Salom, {}!
 ① Video yoki rasm yuboring.
 ② Effektni tanlang.
 ③ Doira tayyor ✔️
@@ -49,38 +50,84 @@ Tezkor buyruqlar:
 🗂 Oxirgi videolarni ko'rish: /history
 ❓ Muallifni yashirish: /hide
 🌐 Tilni o'zgartirish: /lang""",
-    
-    'processing': "⏳ Ishlov berilmoqda...",
-    'success': "✅ Tayyor! Sizning doiraviy videongiz:",
-    'error': "❌ Xatolik yuz berdi. Iltimos, qayta urinib ko'ring.",
-    'unsupported': "❌ Qo'llab-quvvatlanmaydigan fayl turi. Faqat video yoki rasm yuboring.",
-    
-    'hide_info': """❓ Muallifni yashirish:
+        
+        'processing': "⏳ Ishlov berilmoqda...",
+        'success': "✅ Tayyor! Sizning doiraviy videongiz:",
+        'error': "❌ Xatolik yuz berdi. Iltimos, qayta urinib ko'ring.",
+        'unsupported': "❌ Qo'llab-quvvatlanmaydigan fayl turi. Faqat video yoki rasm yuboring.",
+        'choose_effect': "🎨 Quyidagi effektlardan birini tanlang:",
+        'effect_processing': "🎬 Effekt qo'llanmoqda...",
+        'history_header': "🗂 Oxirgi kruzhok videolaringiz:",
+        'history_empty': "📭 Hali kruzhok yaratmagansiz. Video yoki rasm yuboring!",
+        'history_count': "📊 Jami yaratilgan kruzhoklar: {count} ta",
+        'lang_selection': "🌐 Quyidagi tillardan birini tanlang:",
+        'language_set': "✅ Til o'zbekchaga o'rnatildi!"
+    },
+    'ru': {
+        'welcome': """👋 Привет, {}!
+① Отправьте видео или фото.
+② Выберите эффект.
+③ Кружок готов ✔️
 
-Telegram'da kruzhok (doiraviy video) yuborayotganda muallif nomi ko'rinadi. 
-Uni yashirish uchun:
+Быстрые команды:
+♻️ Перезапустить бота: /start
+🗂 Посмотреть последние видео: /history
+❓ Скрыть автора: /hide
+🌐 Изменить язык: /lang""",
+        
+        'processing': "⏳ Обрабатывается...",
+        'success': "✅ Готово! Ваше круглое видео:",
+        'error': "❌ Произошла ошибка. Попробуйте еще раз.",
+        'unsupported': "❌ Неподдерживаемый тип файла. Отправьте только видео или фото.",
+        'choose_effect': "🎨 Выберите один из следующих эффектов:",
+        'effect_processing': "🎬 Применяется эффект...",
+        'history_header': "🗂 Ваши последние кружки:",
+        'history_empty': "📭 Вы еще не создали кружки. Отправьте видео или фото!",
+        'history_count': "📊 Всего создано кружков: {count} шт.",
+        'lang_selection': "🌐 Выберите один из следующих языков:",
+        'language_set': "✅ Язык установлен на русский!"
+    },
+    'en': {
+        'welcome': """👋 Hello, {}!
+① Send a video or photo.
+② Choose an effect.
+③ Circle ready ✔️
 
-1. Videoni tayyor kruzhok sifatida saqlang
-2. Uni boshqa suhbatga yo'naltiring
-3. Yoki botdan olingan kruzhokni to'g'ridan-to'g'ri ulashing
-
-Eslatma: Bu Telegram'ning xususiyati bo'lib, bot orqali to'liq nazorat qilib bo'lmaydi.""",
-    
-    'lang_selection': """🌐 Til tanlash:
-
-Hozirda qo'llab-quvvatlanadigan tillar:
-🇺🇿 O'zbek tili (joriy)
-🇷🇺 Rus tili (tez orada)
-🇺🇸 Ingliz tili (tez orada)
-
-Til o'zgartirish funksiyasi ishlab chiqilmoqda...""",
-    
-    'choose_effect': "🎨 Quyidagi effektlardan birini tanlang:",
-    'effect_processing': "🎬 Effekt qo'llanmoqda...",
-    'history_header': "🗂 Oxirgi kruzhok videolaringiz:",
-    'history_empty': "📭 Hali kruzhok yaratmagansiz. Video yoki rasm yuboring!",
-    'history_count': "📊 Jami yaratilgan kruzhoklar: {count} ta"
+Quick commands:
+♻️ Restart bot: /start
+🗂 View recent videos: /history
+❓ Hide author: /hide
+🌐 Change language: /lang""",
+        
+        'processing': "⏳ Processing...",
+        'success': "✅ Done! Your circular video:",
+        'error': "❌ An error occurred. Please try again.",
+        'unsupported': "❌ Unsupported file type. Send video or photo only.",
+        'choose_effect': "🎨 Choose one of the following effects:",
+        'effect_processing': "🎬 Applying effect...",
+        'history_header': "🗂 Your recent circles:",
+        'history_empty': "📭 You haven't created any circles yet. Send a video or photo!",
+        'history_count': "📊 Total circles created: {count}",
+        'lang_selection': "🌐 Choose one of the following languages:",
+        'language_set': "✅ Language set to English!"
+    }
 }
+
+def get_user_messages(user_id):
+    """Get messages in user's preferred language"""
+    lang = get_user_language(user_id)
+    return MESSAGES.get(lang, MESSAGES['uz'])
+
+def create_language_keyboard():
+    """Create inline keyboard for language selection"""
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    
+    btn_uz = types.InlineKeyboardButton("🇺🇿 O'zbek tili", callback_data="lang_uz")
+    btn_ru = types.InlineKeyboardButton("🇷🇺 Русский язык", callback_data="lang_ru") 
+    btn_en = types.InlineKeyboardButton("🇺🇸 English", callback_data="lang_en")
+    
+    markup.add(btn_uz, btn_ru, btn_en)
+    return markup
 
 def create_effect_keyboard():
     """Create inline keyboard for effect selection"""
@@ -228,35 +275,41 @@ def process_photo_to_kruzhok(input_path, output_path, effect_type=1):
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    """Handle /start command"""
-    user_name = message.from_user.first_name or "Foydalanuvchi"
-    welcome_text = MESSAGES['welcome'].format(user_name)
-    bot.reply_to(message, welcome_text)
+    """Handle /start command - show language selection for new users"""
+    user_id = message.from_user.id
+    
+    # Always show language selection first for /start command
+    markup = create_language_keyboard()
+    bot.reply_to(message, "🌐 Tilni tanlang / Выберите язык / Choose language:", reply_markup=markup)
 
 @bot.message_handler(commands=['hide'])
 def send_hide_info(message):
     """Handle /hide command"""
-    bot.reply_to(message, MESSAGES['hide_info'])
+    messages = get_user_messages(message.from_user.id)
+    bot.reply_to(message, messages.get('hide_info', 'Info not available'))
 
 @bot.message_handler(commands=['lang'])
 def send_lang_selection(message):
-    """Handle /lang command"""
-    bot.reply_to(message, MESSAGES['lang_selection'])
+    """Handle /lang command - show language selection"""
+    messages = get_user_messages(message.from_user.id)
+    markup = create_language_keyboard()
+    bot.reply_to(message, messages['lang_selection'], reply_markup=markup)
 
 @bot.message_handler(commands=['history'])
 def send_history(message):
     """Handle /history command - show user's recent kruzhok videos"""
     try:
         user_id = message.from_user.id
+        messages = get_user_messages(user_id)
         history = get_user_history(user_id, limit=10)
         total_count = get_total_user_kruzhoks(user_id)
         
         if not history:
-            bot.reply_to(message, MESSAGES['history_empty'])
+            bot.reply_to(message, messages['history_empty'])
             return
         
         # Send header message
-        header_text = f"{MESSAGES['history_header']}\n{MESSAGES['history_count'].format(count=total_count)}"
+        header_text = f"{messages['history_header']}\n{messages['history_count'].format(count=total_count)}"
         bot.reply_to(message, header_text)
         
         # Send each kruzhok from history
@@ -277,7 +330,8 @@ def send_history(message):
                 
     except Exception as e:
         logger.error(f"Error handling history command: {e}")
-        bot.reply_to(message, MESSAGES['error'])
+        messages = get_user_messages(user_id)
+        bot.reply_to(message, messages['error'])
 
 @bot.message_handler(content_types=['video'])
 def handle_video(message):
@@ -305,12 +359,14 @@ def handle_video(message):
         user_states[user_id] = 'choosing_effect'
         
         # Send effect selection menu with inline keyboard
+        messages = get_user_messages(user_id)
         markup = create_effect_keyboard()
-        bot.reply_to(message, MESSAGES['choose_effect'], reply_markup=markup)
+        bot.reply_to(message, messages['choose_effect'], reply_markup=markup)
             
     except Exception as e:
         logger.error(f"Error handling video: {e}")
-        bot.reply_to(message, MESSAGES['error'])
+        messages = get_user_messages(user_id)
+        bot.reply_to(message, messages['error'])
 
 @bot.message_handler(content_types=['photo'])
 def handle_photo(message):
@@ -339,17 +395,20 @@ def handle_photo(message):
         user_states[user_id] = 'choosing_effect'
         
         # Send effect selection menu with inline keyboard
+        messages = get_user_messages(user_id)
         markup = create_effect_keyboard()
-        bot.reply_to(message, MESSAGES['choose_effect'], reply_markup=markup)
+        bot.reply_to(message, messages['choose_effect'], reply_markup=markup)
             
     except Exception as e:
         logger.error(f"Error handling photo: {e}")
-        bot.reply_to(message, MESSAGES['error'])
+        messages = get_user_messages(user_id)
+        bot.reply_to(message, messages['error'])
 
 @bot.message_handler(content_types=['document', 'audio', 'voice', 'sticker'])
 def handle_unsupported(message):
     """Handle unsupported file types"""
-    bot.reply_to(message, MESSAGES['unsupported'])
+    messages = get_user_messages(message.from_user.id)
+    bot.reply_to(message, messages['unsupported'])
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('effect_'))
 def handle_effect_callback(call):
@@ -368,12 +427,48 @@ def handle_effect_callback(call):
         logger.error(f"Error handling effect callback: {e}")
         bot.answer_callback_query(call.id, text="❌ Xatolik yuz berdi")
 
+@bot.callback_query_handler(func=lambda call: call.data.startswith('lang_'))
+def handle_language_callback(call):
+    """Handle language selection callbacks"""
+    try:
+        user_id = call.from_user.id
+        lang_code = call.data.split('_')[1]  # Extract 'uz', 'ru', or 'en'
+        
+        # Set user language
+        set_user_language(
+            user_id=user_id,
+            username=call.from_user.username,
+            first_name=call.from_user.first_name,
+            language_code=lang_code
+        )
+        
+        # Get messages in new language
+        messages = get_user_messages(user_id)
+        
+        # Answer callback and show success message
+        bot.answer_callback_query(call.id)
+        bot.edit_message_text(
+            messages['language_set'],
+            call.message.chat.id,
+            call.message.message_id
+        )
+        
+        # Send welcome message in new language
+        user_name = call.from_user.first_name or "User"
+        welcome_text = messages['welcome'].format(user_name)
+        bot.send_message(call.message.chat.id, welcome_text)
+        
+    except Exception as e:
+        logger.error(f"Error handling language callback: {e}")
+        bot.answer_callback_query(call.id, text="❌ Error")
+
 @bot.message_handler(func=lambda message: True)
 def handle_text_messages(message):
     """Handle all text messages"""
-    # Default welcome message
-    user_name = message.from_user.first_name or "Foydalanuvchi"
-    welcome_text = MESSAGES['welcome'].format(user_name)
+    # Default welcome message in user's language
+    messages = get_user_messages(message.from_user.id)
+    user_name = message.from_user.first_name or "User"
+    welcome_text = messages['welcome'].format(user_name)
     bot.reply_to(message, welcome_text)
 
 def process_media_with_effect_callback(call, effect_type):
@@ -381,12 +476,14 @@ def process_media_with_effect_callback(call, effect_type):
     user_id = call.from_user.id
     
     try:
+        messages = get_user_messages(user_id)
+        
         if user_id not in user_media_files:
-            bot.edit_message_text("❌ Media fayl topilmadi", call.message.chat.id, call.message.message_id)
+            bot.edit_message_text(messages['error'], call.message.chat.id, call.message.message_id)
             return
         
         # Edit message to show processing
-        bot.edit_message_text(MESSAGES['effect_processing'], call.message.chat.id, call.message.message_id)
+        bot.edit_message_text(messages['effect_processing'], call.message.chat.id, call.message.message_id)
         
         media_info = user_media_files[user_id]
         input_file = media_info['file_path']
@@ -428,7 +525,7 @@ def process_media_with_effect_callback(call, effect_type):
             bot.delete_message(call.message.chat.id, call.message.message_id)
         else:
             bot.edit_message_text(
-                MESSAGES['error'],
+                messages['error'],
                 call.message.chat.id,
                 call.message.message_id
             )
@@ -445,7 +542,8 @@ def process_media_with_effect_callback(call, effect_type):
             
     except Exception as e:
         logger.error(f"Error processing media with effect: {e}")
-        bot.edit_message_text("❌ Xatolik yuz berdi", call.message.chat.id, call.message.message_id)
+        messages = get_user_messages(user_id)
+        bot.edit_message_text(messages['error'], call.message.chat.id, call.message.message_id)
         
         # Clear user state on error
         if user_id in user_states:

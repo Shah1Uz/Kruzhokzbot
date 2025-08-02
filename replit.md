@@ -22,13 +22,15 @@ Preferred communication style: Simple, everyday language.
 - **Temporary File Management**: Uses Python's tempfile module for secure temporary file handling during processing
 
 ### User Interface Design
-- **Language**: Uzbek language interface with localized messages
+- **Multi-Language Support**: Complete 3-language interface (Uzbek, Russian, English) with database-stored user preferences
+- **Language Selection**: Interactive language picker on /start command with flag emojis
 - **Interaction Flow**: Three-step process (upload → select effect → receive result)
 - **Effect Selection**: 5 different video effects with professional inline keyboard buttons (📹 Oddiy, 🔍 Zoom, 🌫️ Blur, 🌈 Rang, 🔄 Aylanish)
-- **Command Structure**: Enhanced commands (/start, /history, /hide, /lang) for user control
+- **Command Structure**: Enhanced commands (/start, /history, /hide, /lang) for user control, all localized
 - **User State Management**: Tracks user's current state (choosing_effect) and stored media files
 - **User Feedback**: Real-time status updates during processing with emoji-enhanced messages
 - **Media History**: PostgreSQL database integration for storing and retrieving user's kruzhok history
+- **Dynamic Language Switching**: Users can change language anytime via /lang command
 
 ### Error Handling
 - **File Validation**: Checks for supported media formats before processing
