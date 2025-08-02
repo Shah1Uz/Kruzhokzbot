@@ -24,7 +24,9 @@ Preferred communication style: Simple, everyday language.
 ### User Interface Design
 - **Language**: Uzbek language interface with localized messages
 - **Interaction Flow**: Three-step process (upload → select effect → receive result)
+- **Effect Selection**: 5 different video effects available (normal, zoom, blur, color change, rotation)
 - **Command Structure**: Simple commands (/start, /hide, /lang) for user control
+- **User State Management**: Tracks user's current state (choosing_effect) and stored media files
 - **User Feedback**: Real-time status updates during processing with emoji-enhanced messages
 
 ### Error Handling

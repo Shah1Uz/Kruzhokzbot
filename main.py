@@ -23,6 +23,10 @@ BOT_TOKEN = os.getenv('BOT_TOKEN', 'your_bot_token_here')
 # Initialize bot
 bot = telebot.TeleBot(BOT_TOKEN)
 
+# User state management
+user_states = {}
+user_media_files = {}
+
 # Uzbek language messages
 MESSAGES = {
     'welcome': """👋 Salom, {}!
@@ -58,7 +62,20 @@ Hozirda qo'llab-quvvatlanadigan tillar:
 🇷🇺 Rus tili (tez orada)
 🇺🇸 Ingliz tili (tez orada)
 
-Til o'zgartirish funksiyasi ishlab chiqilmoqda..."""
+Til o'zgartirish funksiyasi ishlab chiqilmoqda...""",
+    
+    'choose_effect': """🎨 Effekt tanlang:
+
+1️⃣ Oddiy dumaloq video
+2️⃣ Zoom effekti (kattalashtirish)
+3️⃣ Blur effekti (loyqalashtirish)
+4️⃣ Rang o'zgarishi effekti
+5️⃣ Aylanish effekti
+
+Raqam yuboring (1-5):""",
+    
+    'invalid_choice': "❌ Noto'g'ri tanlov. Iltimos, 1 dan 5 gacha raqam yuboring.",
+    'effect_processing': "🎬 Effekt qo'llanmoqda..."
 }
 
 def create_temp_file(suffix=""):
@@ -92,8 +109,8 @@ def get_video_duration(input_path):
         logger.error(f"Error getting video duration: {e}")
         return 10.0  # Default fallback
 
-def process_video_to_kruzhok(input_path, output_path):
-    """Convert video to circular kruzhok format using ffmpeg"""
+def process_video_to_kruzhok(input_path, output_path, effect_type=1):
+    """Convert video to circular kruzhok format using ffmpeg with effects"""
     try:
         # Get video info first
         duration = get_video_duration(input_path)
@@ -101,16 +118,26 @@ def process_video_to_kruzhok(input_path, output_path):
         # Limit duration to 60 seconds for kruzhok
         duration = min(duration, 60.0)
         
-        # FFmpeg command to create circular video
+        # Define video filter based on effect type
+        if effect_type == 1:  # Oddiy dumaloq video
+            video_filter = 'scale=480:480:force_original_aspect_ratio=increase,crop=480:480,format=yuv420p'
+        elif effect_type == 2:  # Zoom effekti
+            video_filter = 'scale=480:480:force_original_aspect_ratio=increase,crop=480:480,zoompan=z=\'min(zoom+0.0015,1.5)\':d=1:x=iw/2-(iw/zoom/2):y=ih/2-(ih/zoom/2),format=yuv420p'
+        elif effect_type == 3:  # Blur effekti
+            video_filter = 'scale=480:480:force_original_aspect_ratio=increase,crop=480:480,gblur=sigma=2:steps=1,format=yuv420p'
+        elif effect_type == 4:  # Rang o'zgarishi effekti
+            video_filter = 'scale=480:480:force_original_aspect_ratio=increase,crop=480:480,hue=h=sin(2*PI*t)*360:s=1.5,format=yuv420p'
+        elif effect_type == 5:  # Aylanish effekti
+            video_filter = 'scale=480:480:force_original_aspect_ratio=increase,crop=480:480,rotate=PI*t/5,format=yuv420p'
+        else:
+            video_filter = 'scale=480:480:force_original_aspect_ratio=increase,crop=480:480,format=yuv420p'
+        
+        # FFmpeg command to create circular video with effects
         cmd = [
             'ffmpeg', '-y',  # Overwrite output file
             '-i', input_path,
             '-t', str(duration),  # Limit duration
-            '-vf', (
-                'scale=480:480:force_original_aspect_ratio=increase,'  # Scale to 480x480
-                'crop=480:480,'  # Crop to square
-                'format=yuv420p'  # Set pixel format
-            ),
+            '-vf', video_filter,
             '-c:v', 'libx264',  # Video codec
             '-c:a', 'aac',      # Audio codec
             '-b:a', '128k',     # Audio bitrate
@@ -133,20 +160,30 @@ def process_video_to_kruzhok(input_path, output_path):
         logger.error(f"Error processing video: {e}")
         return False
 
-def process_photo_to_kruzhok(input_path, output_path):
-    """Convert photo to 5-second circular kruzhok"""
+def process_photo_to_kruzhok(input_path, output_path, effect_type=1):
+    """Convert photo to 5-second circular kruzhok with effects"""
     try:
-        # FFmpeg command to create 5-second circular video from image
+        # Define video filter based on effect type
+        if effect_type == 1:  # Oddiy dumaloq video
+            video_filter = 'scale=480:480:force_original_aspect_ratio=increase,crop=480:480,format=yuv420p'
+        elif effect_type == 2:  # Zoom effekti
+            video_filter = 'scale=480:480:force_original_aspect_ratio=increase,crop=480:480,zoompan=z=\'min(zoom+0.002,1.8)\':d=1:x=iw/2-(iw/zoom/2):y=ih/2-(ih/zoom/2),format=yuv420p'
+        elif effect_type == 3:  # Blur effekti
+            video_filter = 'scale=480:480:force_original_aspect_ratio=increase,crop=480:480,gblur=sigma=3:steps=2,format=yuv420p'
+        elif effect_type == 4:  # Rang o'zgarishi effekti
+            video_filter = 'scale=480:480:force_original_aspect_ratio=increase,crop=480:480,hue=h=sin(2*PI*t/3)*180:s=1.3,format=yuv420p'
+        elif effect_type == 5:  # Aylanish effekti
+            video_filter = 'scale=480:480:force_original_aspect_ratio=increase,crop=480:480,rotate=PI*t/3,format=yuv420p'
+        else:
+            video_filter = 'scale=480:480:force_original_aspect_ratio=increase,crop=480:480,format=yuv420p'
+        
+        # FFmpeg command to create 5-second circular video from image with effects
         cmd = [
             'ffmpeg', '-y',  # Overwrite output file
             '-loop', '1',    # Loop the input image
             '-i', input_path,
             '-t', '5',       # 5 seconds duration
-            '-vf', (
-                'scale=480:480:force_original_aspect_ratio=increase,'  # Scale to 480x480
-                'crop=480:480,'  # Crop to square
-                'format=yuv420p'  # Set pixel format
-            ),
+            '-vf', video_filter,
             '-c:v', 'libx264',  # Video codec
             '-pix_fmt', 'yuv420p',
             '-r', '25',         # Frame rate
@@ -188,48 +225,29 @@ def send_lang_selection(message):
 def handle_video(message):
     """Handle video messages"""
     try:
-        # Send processing message
-        processing_msg = bot.reply_to(message, MESSAGES['processing'])
+        user_id = message.from_user.id
         
         # Get file info
         file_info = bot.get_file(message.video.file_id)
         
-        # Create temporary files
+        # Create temporary file
         input_file = create_temp_file(suffix='.mp4')
-        output_file = create_temp_file(suffix='.mp4')
         
-        try:
-            # Download the video
-            downloaded_file = bot.download_file(file_info.file_path)
-            with open(input_file, 'wb') as f:
-                f.write(downloaded_file)
-            
-            # Process video to kruzhok
-            if process_video_to_kruzhok(input_file, output_file):
-                # Send the kruzhok
-                with open(output_file, 'rb') as video:
-                    bot.send_video_note(
-                        message.chat.id,
-                        video,
-                        duration=min(60, message.video.duration or 10),
-                        length=480,  # Circular video diameter
-                        reply_to_message_id=message.message_id
-                    )
-                
-                # Delete processing message
-                bot.delete_message(message.chat.id, processing_msg.message_id)
-                
-            else:
-                bot.edit_message_text(
-                    MESSAGES['error'],
-                    message.chat.id,
-                    processing_msg.message_id
-                )
+        # Download the video
+        downloaded_file = bot.download_file(file_info.file_path)
+        with open(input_file, 'wb') as f:
+            f.write(downloaded_file)
         
-        finally:
-            # Clean up temporary files
-            cleanup_file(input_file)
-            cleanup_file(output_file)
+        # Store user media file and set state
+        user_media_files[user_id] = {
+            'file_path': input_file,
+            'media_type': 'video',
+            'duration': message.video.duration or 10
+        }
+        user_states[user_id] = 'choosing_effect'
+        
+        # Send effect selection menu
+        bot.reply_to(message, MESSAGES['choose_effect'])
             
     except Exception as e:
         logger.error(f"Error handling video: {e}")
@@ -239,49 +257,30 @@ def handle_video(message):
 def handle_photo(message):
     """Handle photo messages"""
     try:
-        # Send processing message
-        processing_msg = bot.reply_to(message, MESSAGES['processing'])
+        user_id = message.from_user.id
         
         # Get the largest photo size
         photo = message.photo[-1]
         file_info = bot.get_file(photo.file_id)
         
-        # Create temporary files
+        # Create temporary file
         input_file = create_temp_file(suffix='.jpg')
-        output_file = create_temp_file(suffix='.mp4')
         
-        try:
-            # Download the photo
-            downloaded_file = bot.download_file(file_info.file_path)
-            with open(input_file, 'wb') as f:
-                f.write(downloaded_file)
-            
-            # Process photo to kruzhok
-            if process_photo_to_kruzhok(input_file, output_file):
-                # Send the kruzhok
-                with open(output_file, 'rb') as video:
-                    bot.send_video_note(
-                        message.chat.id,
-                        video,
-                        duration=5,  # 5 seconds for photos
-                        length=480,  # Circular video diameter
-                        reply_to_message_id=message.message_id
-                    )
-                
-                # Delete processing message
-                bot.delete_message(message.chat.id, processing_msg.message_id)
-                
-            else:
-                bot.edit_message_text(
-                    MESSAGES['error'],
-                    message.chat.id,
-                    processing_msg.message_id
-                )
+        # Download the photo
+        downloaded_file = bot.download_file(file_info.file_path)
+        with open(input_file, 'wb') as f:
+            f.write(downloaded_file)
         
-        finally:
-            # Clean up temporary files
-            cleanup_file(input_file)
-            cleanup_file(output_file)
+        # Store user media file and set state
+        user_media_files[user_id] = {
+            'file_path': input_file,
+            'media_type': 'photo',
+            'duration': 5
+        }
+        user_states[user_id] = 'choosing_effect'
+        
+        # Send effect selection menu
+        bot.reply_to(message, MESSAGES['choose_effect'])
             
     except Exception as e:
         logger.error(f"Error handling photo: {e}")
@@ -295,9 +294,85 @@ def handle_unsupported(message):
 @bot.message_handler(func=lambda message: True)
 def handle_text_messages(message):
     """Handle all text messages"""
-    user_name = message.from_user.first_name or "Foydalanuvchi"
-    welcome_text = MESSAGES['welcome'].format(user_name)
-    bot.reply_to(message, welcome_text)
+    user_id = message.from_user.id
+    text = message.text.strip()
+    
+    # Check if user is choosing effect
+    if user_states.get(user_id) == 'choosing_effect':
+        if text in ['1', '2', '3', '4', '5']:
+            effect_type = int(text)
+            process_media_with_effect(message, effect_type)
+        else:
+            bot.reply_to(message, MESSAGES['invalid_choice'])
+    else:
+        # Default welcome message
+        user_name = message.from_user.first_name or "Foydalanuvchi"
+        welcome_text = MESSAGES['welcome'].format(user_name)
+        bot.reply_to(message, welcome_text)
+
+def process_media_with_effect(message, effect_type):
+    """Process stored media with selected effect"""
+    user_id = message.from_user.id
+    
+    try:
+        if user_id not in user_media_files:
+            bot.reply_to(message, MESSAGES['error'])
+            return
+        
+        # Send processing message
+        processing_msg = bot.reply_to(message, MESSAGES['effect_processing'])
+        
+        media_info = user_media_files[user_id]
+        input_file = media_info['file_path']
+        output_file = create_temp_file(suffix='.mp4')
+        
+        # Process based on media type
+        success = False
+        if media_info['media_type'] == 'video':
+            success = process_video_to_kruzhok(input_file, output_file, effect_type)
+        elif media_info['media_type'] == 'photo':
+            success = process_photo_to_kruzhok(input_file, output_file, effect_type)
+        
+        if success:
+            # Send the kruzhok
+            with open(output_file, 'rb') as video:
+                bot.send_video_note(
+                    message.chat.id,
+                    video,
+                    duration=media_info['duration'],
+                    length=480,  # Circular video diameter
+                    reply_to_message_id=message.message_id
+                )
+            
+            # Delete processing message
+            bot.delete_message(message.chat.id, processing_msg.message_id)
+        else:
+            bot.edit_message_text(
+                MESSAGES['error'],
+                message.chat.id,
+                processing_msg.message_id
+            )
+        
+        # Clean up
+        cleanup_file(input_file)
+        cleanup_file(output_file)
+        
+        # Clear user state
+        if user_id in user_states:
+            del user_states[user_id]
+        if user_id in user_media_files:
+            del user_media_files[user_id]
+            
+    except Exception as e:
+        logger.error(f"Error processing media with effect: {e}")
+        bot.reply_to(message, MESSAGES['error'])
+        
+        # Clear user state on error
+        if user_id in user_states:
+            del user_states[user_id]
+        if user_id in user_media_files:
+            cleanup_file(user_media_files[user_id]['file_path'])
+            del user_media_files[user_id]
 
 def main():
     """Main function to start the bot"""
