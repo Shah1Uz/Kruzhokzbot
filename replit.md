@@ -24,10 +24,11 @@ Preferred communication style: Simple, everyday language.
 ### User Interface Design
 - **Language**: Uzbek language interface with localized messages
 - **Interaction Flow**: Three-step process (upload → select effect → receive result)
-- **Effect Selection**: 5 different video effects available (normal, zoom, blur, color change, rotation)
-- **Command Structure**: Simple commands (/start, /hide, /lang) for user control
+- **Effect Selection**: 5 different video effects with professional inline keyboard buttons (📹 Oddiy, 🔍 Zoom, 🌫️ Blur, 🌈 Rang, 🔄 Aylanish)
+- **Command Structure**: Enhanced commands (/start, /history, /hide, /lang) for user control
 - **User State Management**: Tracks user's current state (choosing_effect) and stored media files
 - **User Feedback**: Real-time status updates during processing with emoji-enhanced messages
+- **Media History**: PostgreSQL database integration for storing and retrieving user's kruzhok history
 
 ### Error Handling
 - **File Validation**: Checks for supported media formats before processing
@@ -45,15 +46,23 @@ Preferred communication style: Simple, everyday language.
 - **Library**: pyTeleBot (telebot)
 - **Integration**: Handles message reception, file downloads, and response delivery
 
+### Database System
+- **Technology**: PostgreSQL with SQLAlchemy ORM
+- **Purpose**: Stores user kruzhok history, effects, and metadata
+- **Tables**: user_history (tracks all created kruzhoks with timestamps and effects)
+- **Integration**: Automatic saving of successful kruzhok creations
+
 ### Media Processing Tools
-- **Likely Tool**: FFmpeg (executed via subprocess)
+- **Tool**: FFmpeg (executed via subprocess)
 - **Purpose**: Video and image manipulation for circular format conversion
 - **Integration**: Command-line execution for media transformation
 
 ### System Dependencies
 - **Python Standard Library**: tempfile, subprocess, pathlib, logging, os, time
+- **Database Libraries**: psycopg2-binary, sqlalchemy
 - **File System**: Temporary directory usage for media processing workflow
 
 ### Runtime Environment
 - **Platform**: Cross-platform Python application
 - **Deployment**: Designed for containerized or server deployment with environment variable configuration
+- **Database**: PostgreSQL database with automatic table creation

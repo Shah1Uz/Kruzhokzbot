@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 import telebot
 from telebot import types
+from models import create_tables, save_user_history, get_user_history, get_total_user_kruzhoks
 
 # Configure logging
 logging.basicConfig(
@@ -27,6 +28,15 @@ bot = telebot.TeleBot(BOT_TOKEN)
 user_states = {}
 user_media_files = {}
 
+# Effect names mapping
+EFFECT_NAMES = {
+    1: "Oddiy",
+    2: "Zoom", 
+    3: "Blur",
+    4: "Rang o'zgarishi",
+    5: "Aylanish"
+}
+
 # Uzbek language messages
 MESSAGES = {
     'welcome': """👋 Salom, {}!
@@ -36,6 +46,7 @@ MESSAGES = {
 
 Tezkor buyruqlar:
 ♻️ Botni qayta ishga tushirish: /start
+🗂 Oxirgi videolarni ko'rish: /history
 ❓ Muallifni yashirish: /hide
 🌐 Tilni o'zgartirish: /lang""",
     
@@ -65,7 +76,10 @@ Hozirda qo'llab-quvvatlanadigan tillar:
 Til o'zgartirish funksiyasi ishlab chiqilmoqda...""",
     
     'choose_effect': "🎨 Quyidagi effektlardan birini tanlang:",
-    'effect_processing': "🎬 Effekt qo'llanmoqda..."
+    'effect_processing': "🎬 Effekt qo'llanmoqda...",
+    'history_header': "🗂 Oxirgi kruzhok videolaringiz:",
+    'history_empty': "📭 Hali kruzhok yaratmagansiz. Video yoki rasm yuboring!",
+    'history_count': "📊 Jami yaratilgan kruzhoklar: {count} ta"
 }
 
 def create_effect_keyboard():
@@ -229,6 +243,42 @@ def send_lang_selection(message):
     """Handle /lang command"""
     bot.reply_to(message, MESSAGES['lang_selection'])
 
+@bot.message_handler(commands=['history'])
+def send_history(message):
+    """Handle /history command - show user's recent kruzhok videos"""
+    try:
+        user_id = message.from_user.id
+        history = get_user_history(user_id, limit=10)
+        total_count = get_total_user_kruzhoks(user_id)
+        
+        if not history:
+            bot.reply_to(message, MESSAGES['history_empty'])
+            return
+        
+        # Send header message
+        header_text = f"{MESSAGES['history_header']}\n{MESSAGES['history_count'].format(count=total_count)}"
+        bot.reply_to(message, header_text)
+        
+        # Send each kruzhok from history
+        for item in history:
+            try:
+                # Create caption with effect info
+                caption = f"🎨 {item.effect_name} | 📅 {item.created_at.strftime('%d.%m.%Y %H:%M')}"
+                
+                # Send the kruzhok video_note
+                bot.send_video_note(
+                    message.chat.id,
+                    item.file_id,
+                    caption=caption if len(caption) <= 1024 else ""  # Telegram caption limit
+                )
+            except Exception as e:
+                logger.error(f"Error sending history item {item.id}: {e}")
+                continue
+                
+    except Exception as e:
+        logger.error(f"Error handling history command: {e}")
+        bot.reply_to(message, MESSAGES['error'])
+
 @bot.message_handler(content_types=['video'])
 def handle_video(message):
     """Handle video messages"""
@@ -352,12 +402,27 @@ def process_media_with_effect_callback(call, effect_type):
         if success:
             # Send the kruzhok
             with open(output_file, 'rb') as video:
-                bot.send_video_note(
+                sent_message = bot.send_video_note(
                     call.message.chat.id,
                     video,
                     duration=media_info['duration'],
                     length=480  # Circular video diameter
                 )
+            
+            # Save to history
+            effect_name = EFFECT_NAMES.get(effect_type, f"Effekt {effect_type}")
+            file_size = os.path.getsize(output_file) if os.path.exists(output_file) else None
+            
+            save_user_history(
+                user_id=user_id,
+                username=call.from_user.username,
+                first_name=call.from_user.first_name,
+                file_id=sent_message.video_note.file_id,
+                original_media_type=media_info['media_type'],
+                effect_type=effect_type,
+                effect_name=effect_name,
+                file_size=file_size
+            )
             
             # Delete processing message
             bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -392,6 +457,14 @@ def process_media_with_effect_callback(call, effect_type):
 def main():
     """Main function to start the bot"""
     logger.info("Starting Kruzhok Bot...")
+    
+    # Initialize database
+    try:
+        create_tables()
+        logger.info("Database tables initialized successfully")
+    except Exception as e:
+        logger.error(f"Error initializing database: {e}")
+        return
     
     # Check if ffmpeg is available
     try:
