@@ -19,7 +19,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Get bot token from environment variables
-BOT_TOKEN = os.getenv('BOT_TOKEN', 'your_bot_token_here')
+BOT_TOKEN = os.getenv('BOT_TOKEN', '7561905786:AAFPVSuvoQipXuVOy2ecm3jCRxyG04e5U6Q')
 
 # Initialize bot
 bot = telebot.TeleBot(BOT_TOKEN)
